@@ -46,7 +46,7 @@ Windows PowerShell 用 `Copy-Item .env.example .env` 替换 `cp`。打开 **http
 
 ## 构建与验证
 
-本地需要 JDK 21、Maven 3.9+；集成测试需要可用 Docker。Linux CI 自动执行全部步骤。
+本地需要 JDK 21；仓库包含 Maven Wrapper，也可使用 Maven 3.9+。集成测试需要可用 Docker。Linux CI 自动执行全部步骤。
 
 ```bash
 mvn -B -ntp test       # 单元测试，编译包括集成测试代码
@@ -54,6 +54,8 @@ mvn -B -ntp verify     # 单元测试 + Testcontainers 真实 Redis/MySQL 并发
 node --check frontend/app.js
 docker compose config -q
 ```
+
+没有 Maven 时使用 `./mvnw`（Windows 为 `.\mvnw.cmd`）替代 `mvn`。
 
 对**全新的独立 Compose 环境**执行：
 

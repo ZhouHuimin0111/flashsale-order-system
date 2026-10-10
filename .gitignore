@@ -1,5 +1,7 @@
 **/target/
 .tools/
+node_modules/
+playwright-report/
 .env
 *.log
 *.pid

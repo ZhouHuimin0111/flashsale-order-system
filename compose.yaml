@@ -43,11 +43,18 @@ services:
       - mq-data:/home/rocketmq/store
     depends_on:
       nameserver: {condition: service_healthy}
+      mq-volume-init: {condition: service_completed_successfully}
     healthcheck:
       test: [CMD-SHELL, 'bash -c "echo > /dev/tcp/127.0.0.1/10911"']
       interval: 5s
       timeout: 3s
       retries: 40
+  mq-volume-init:
+    image: apache/rocketmq:5.3.2
+    user: root
+    entrypoint: [/bin/sh, -c]
+    command: ['chown -R rocketmq:rocketmq /home/rocketmq/store']
+    volumes: [mq-data:/home/rocketmq/store]
   mq-init:
     image: apache/rocketmq:5.3.2
     entrypoint: [/bin/sh, -c]
