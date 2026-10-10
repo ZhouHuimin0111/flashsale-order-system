@@ -1,0 +1,8 @@
+FROM eclipse-temurin:21-jre-alpine
+ARG MODULE=order-service
+WORKDIR /app
+RUN addgroup -S app && adduser -S app -G app
+COPY ${MODULE}/target/${MODULE}-1.0.0.jar app.jar
+USER app
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=70 -Duser.timezone=UTC"
+ENTRYPOINT ["java","-jar","/app/app.jar"]

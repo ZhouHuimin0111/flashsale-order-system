@@ -1,0 +1,59 @@
+name: Verify orders
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Compile, unit tests, real Redis/MySQL concurrency tests
+        run: mvn -B -ntp verify
+      - name: Validate frontend and compose
+        run: |
+          node --check frontend/app.js
+          node --check scripts/e2e.mjs
+          docker compose config -q
+      - name: Build tested jars as runtime images
+        run: |
+          docker build -f Dockerfile.runtime --build-arg MODULE=order-service -t flashsale-order-service:local .
+          docker build -f Dockerfile.runtime --build-arg MODULE=gateway -t flashsale-gateway:local .
+      - name: Start two-instance stack
+        run: docker compose up -d --no-build --wait --wait-timeout 240
+      - name: End-to-end admission and RocketMQ delivery
+        env: {TEST_ENVIRONMENT: 'GitHub Actions ubuntu-latest / Java 21 / two order instances'}
+        run: |
+          node scripts/e2e.mjs
+          bash scripts/assert-database.sh
+      - name: Broker outage and application restart recovery
+        run: node scripts/failure-recovery.mjs
+      - name: Collect reports and container logs
+        if: always()
+        run: |
+          mkdir -p test-results
+          docker compose logs --no-color > test-results/compose.log 2>&1 || true
+          docker compose ps -a > test-results/compose-status.txt 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-reports
+          path: |
+            test-results/
+            order-service/target/surefire-reports/
+            order-service/target/failsafe-reports/
+          retention-days: 14
+      - name: Stop temporary CI services
+        if: always()
+        run: docker compose down

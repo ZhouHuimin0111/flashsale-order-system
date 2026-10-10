@@ -1,0 +1,112 @@
+name: flashsale
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: flashsale
+      MYSQL_USER: flashsale
+      MYSQL_PASSWORD: ${DB_PASSWORD:-local-demo-password}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-local-root-password}
+    volumes: [mysql-data:/var/lib/mysql]
+    healthcheck:
+      test: [CMD-SHELL, 'mysqladmin ping -h 127.0.0.1 -u root -p"$$MYSQL_ROOT_PASSWORD" --silent']
+      interval: 5s
+      timeout: 5s
+      retries: 40
+  redis:
+    image: redis:7.4-alpine
+    command: [redis-server, --appendonly, 'yes', --appendfsync, always, --maxmemory-policy, noeviction]
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  nameserver:
+    image: apache/rocketmq:5.3.2
+    command: sh mqnamesrv
+    environment:
+      JAVA_OPT_EXT: '-Xms128m -Xmx256m -Xmn64m'
+    healthcheck:
+      test: [CMD-SHELL, 'bash -c "echo > /dev/tcp/127.0.0.1/9876"']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  broker:
+    image: apache/rocketmq:5.3.2
+    command: sh mqbroker -c /home/rocketmq/broker.conf
+    environment:
+      NAMESRV_ADDR: nameserver:9876
+      JAVA_OPT_EXT: '-Xms256m -Xmx512m -Xmn128m'
+    volumes:
+      - ./infra/broker.conf:/home/rocketmq/broker.conf:ro
+      - mq-data:/home/rocketmq/store
+    depends_on:
+      nameserver: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, 'bash -c "echo > /dev/tcp/127.0.0.1/10911"']
+      interval: 5s
+      timeout: 3s
+      retries: 40
+  mq-init:
+    image: apache/rocketmq:5.3.2
+    entrypoint: [/bin/sh, -c]
+    command:
+      - 'sh mqadmin updateTopic -n nameserver:9876 -b broker:10911 -t flashsale-orders -r 8 -w 8'
+    depends_on:
+      broker: {condition: service_healthy}
+  order-1:
+    image: flashsale-order-service:local
+    build: {context: ., args: {MODULE: order-service}}
+    environment: &order-env
+      SERVER_PORT: 8081
+      DB_URL: jdbc:mysql://mysql:3306/flashsale?useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC
+      DB_USER: flashsale
+      DB_PASSWORD: ${DB_PASSWORD:-local-demo-password}
+      REDIS_HOST: redis
+      MQ_NAMESERVER: nameserver:9876
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+    mem_limit: 512m
+    depends_on: &order-deps
+      mysql: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      mq-init: {condition: service_completed_successfully}
+    healthcheck: &order-health
+      test: [CMD-SHELL, 'wget -qO- http://localhost:8081/actuator/health/readiness | grep -q UP']
+      interval: 5s
+      timeout: 5s
+      retries: 60
+  order-2:
+    image: flashsale-order-service:local
+    build: {context: ., args: {MODULE: order-service}}
+    environment: *order-env
+    mem_limit: 512m
+    depends_on: *order-deps
+    healthcheck: *order-health
+  gateway:
+    image: flashsale-gateway:local
+    build: {context: ., args: {MODULE: gateway}}
+    environment:
+      ORDER_SERVICE_1: http://order-1:8081
+      ORDER_SERVICE_2: http://order-2:8081
+    mem_limit: 384m
+    depends_on:
+      order-1: {condition: service_healthy}
+      order-2: {condition: service_healthy}
+    healthcheck:
+      test: [CMD-SHELL, 'wget -qO- http://localhost:8080/actuator/health | grep -q UP']
+      interval: 5s
+      timeout: 5s
+      retries: 40
+  web:
+    image: nginx:1.28-alpine
+    ports: ['127.0.0.1:8080:80']
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./infra/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      gateway: {condition: service_healthy}
+volumes:
+  mysql-data:
+  redis-data:
+  mq-data:

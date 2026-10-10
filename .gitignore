@@ -1,0 +1,9 @@
+**/target/
+.tools/
+.env
+*.log
+*.pid
+.idea/
+.vscode/
+test-results/
+!test-results/.gitkeep

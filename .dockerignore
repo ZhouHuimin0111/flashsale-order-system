@@ -1,0 +1,7 @@
+.git
+**/target
+.tools
+.env
+*.log
+test-results
+docs
