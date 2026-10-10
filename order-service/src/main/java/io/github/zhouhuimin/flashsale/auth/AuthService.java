@@ -30,10 +30,12 @@ public class AuthService {
     @EventListener(ApplicationReadyEvent.class) public void bootstrap() {
         if (!adminPassword.isBlank()) {
             if (adminPassword.length() < 12) throw new IllegalArgumentException("BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters");
+            validatePassword(adminPassword);
             db.update("INSERT IGNORE INTO app_user(username,password_hash,role) VALUES ('admin',?,'ADMIN')", encoder.encode(adminPassword));
         }
     }
     public Map<String, Object> register(String username, String password) {
+        validatePassword(password);
         if ("admin".equalsIgnoreCase(username)) throw new ApiError(HttpStatus.CONFLICT, "USERNAME_TAKEN", "用户名已保留");
         rateLimit("register", username.toLowerCase());
         try { db.update("INSERT INTO app_user(username,password_hash) VALUES (?,?)", username, encoder.encode(password)); }
@@ -41,6 +43,7 @@ public class AuthService {
         return login(username, password);
     }
     public Map<String, Object> login(String username, String password) {
+        validatePassword(password);
         rateLimit("login", username.toLowerCase());
         var users = db.query("SELECT id,username,password_hash,role FROM app_user WHERE username=?",
             (rs, n) -> Map.<String, Object>of("id", rs.getLong(1), "username", rs.getString(2), "hash", rs.getString(3), "role", rs.getString(4)), username);
@@ -59,6 +62,10 @@ public class AuthService {
         return new CurrentUser(Long.parseLong(fields.get(0).toString()), fields.get(1).toString(), fields.get(2).toString());
     }
     public void logout(String token) { redis.delete("session:" + token); }
+    private void validatePassword(String password) {
+        if (password.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72)
+            throw new ApiError(HttpStatus.BAD_REQUEST, "INVALID_INPUT", "密码的 UTF-8 长度不得超过 72 字节");
+    }
     private void rateLimit(String action, String username) {
         Long count = redis.execute(RedisConfig.script("rate-limit.lua", Long.class), List.of("auth:limit:" + action + ":" + username), "60");
         if (count != null && count > 10) throw new ApiError(HttpStatus.TOO_MANY_REQUESTS, "RATE_LIMITED", "尝试过于频繁，请稍后再试");

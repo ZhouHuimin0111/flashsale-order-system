@@ -129,7 +129,7 @@ class CoreConcurrencyIT {
     }
     @Test void responseLossCanRecoverReservationWithoutKnowingOrderId() {
         var service=new OrderService(redis,db,metrics);
-        assertTrue(service.pending(1).isEmpty());
+        assertTrue(service.pending(1).stream().noneMatch(row->row.get("couponId").equals(coupon)));
         var reservation=service.reserve(coupon,1);
         assertTrue(service.pending(1).stream().anyMatch(row->row.get("orderId").equals(reservation.orderId())));
     }
@@ -141,5 +141,15 @@ class CoreConcurrencyIT {
         assertEquals("REJECTED",service.status(coupon,reservation.orderId(),1).get("status"));
         assertEquals("0",redis.opsForHash().get(OrderKeys.inventory(coupon),"stock"));
         assertEquals("SOLD_OUT",assertThrows(ApiError.class,()->service.reserve(coupon,2)).code());
+    }
+    @Test void administrativeRedrivePreservesOrderIdentityAndOnlyAllowsPending() throws Exception {
+        var service=new OrderService(redis,db,metrics);
+        var r=service.reserve(coupon,1);
+        var keys=List.of(OrderKeys.owners(coupon),OrderKeys.status(coupon),OrderKeys.outbox(coupon));
+        assertEquals(1L,redis.execute(RedisConfig.script("redrive.lua",Long.class),keys,r.orderId(),String.valueOf(coupon)));
+        assertEquals(3L,redis.opsForStream().size(OrderKeys.outbox(coupon)));
+        new OrderConsumer(writer,locks,redis,metrics).consume(new OrderEvent(r.orderId(),1,coupon));
+        assertEquals(0L,redis.execute(RedisConfig.script("redrive.lua",Long.class),keys,r.orderId(),String.valueOf(coupon)));
+        assertEquals(0L,redis.execute(RedisConfig.script("redrive.lua",Long.class),keys,UUID.randomUUID().toString(),String.valueOf(coupon)));
     }
 }

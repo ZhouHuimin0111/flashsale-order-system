@@ -7,7 +7,7 @@
 | 方法 | 路径 | 输入 / 结果 |
 | --- | --- | --- |
 | POST | `/auth/register` | `{"username":"alice","password":"AlicePass2026!"}` → `{token,expiresIn,user}` |
-| POST | `/auth/login` | 同上。用户名 3–32 位字母数字下划线；密码 8–64 字符 |
+| POST | `/auth/login` | 同上。用户名 3–32 位字母数字下划线；密码 8–64 字符且 UTF-8 长度最多 72 字节 |
 | GET | `/auth/me` | 当前 `{id,username,role}` |
 | POST | `/auth/logout` | 删除会话，其他实例同时失效 |
 
