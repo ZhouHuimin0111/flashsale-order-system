@@ -7,6 +7,21 @@
 
 秒杀返回 **HTTP 202 / PENDING 表示预留请求已接收**；只有 MySQL 事务提交后，订单才是 **CONFIRMED**。项目不包含支付、退款、短信或物流。
 
+![真实运行的桌面首页](docs/screenshots/desktop-home.png)
+
+[订单页面](docs/screenshots/desktop-order.png) · [社交页面](docs/screenshots/desktop-community.png) · [手机页面](docs/screenshots/mobile-home.png)
+
+## 已验证结果
+
+2026-10-10 的[完整 CI 运行](https://github.com/ZhouHuimin0111/flashsale-order-system/actions/runs/38035311954)通过：
+
+- 5 项单元测试、9 项真实 Redis/MySQL 集成测试，失败/错误/跳过均为 0。
+- 60 用户、120 请求、30 并发争抢 20 份库存：20 个预留、20 次返回同一订单的重复请求、80 次售罄拒绝，最终 20 个确认订单；独立 SQL 核验库存为 0、重复买家为 0。
+- 停 RocketMQ Broker 并重启两个订单实例后，持久化待发送事件成功恢复，重复提交返回原订单 ID。
+- Chromium 桌面/手机两套真实页面流程通过，截图如上。
+
+测试环境和数据边界见[验证记录](docs/VERIFICATION.md)。这是一组正确性验证，未声称生产容量。
+
 ## 核心实现
 
 | 业务问题 | 实现方式 |

@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-10-10T07:43:59.639Z",
+  "environment": "GitHub Actions ubuntu-latest / Java 21 / two order instances",
+  "users": 60,
+  "requests": 120,
+  "concurrency": 30,
+  "initialStock": 20,
+  "accepted": 20,
+  "duplicates": 20,
+  "soldOut": 80,
+  "confirmed": 20,
+  "backendInstances": 2,
+  "admissionElapsedMs": 872,
+  "admissionRequestsPerSecond": 137.66,
+  "latencyMs": {
+    "p50": 158,
+    "p95": 465,
+    "p99": 492
+  },
+  "note": "Single-run correctness smoke test including rejected/duplicate HTTP responses; not a production capacity claim."
+}

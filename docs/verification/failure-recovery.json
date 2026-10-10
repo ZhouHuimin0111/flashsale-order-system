@@ -1,0 +1,9 @@
+{
+  "timestamp": "2026-10-10T07:44:43.437Z",
+  "brokerOutage": true,
+  "bothApplicationsRestarted": true,
+  "bothApplicationsReady": true,
+  "orderId": "23cd0208-e8f7-4bf9-b1ae-38a5ae2bda78",
+  "recovered": true,
+  "duplicateReturnedSameOrder": true
+}
