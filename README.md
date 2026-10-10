@@ -67,6 +67,8 @@ node scripts/failure-recovery.mjs  # 会暂时停 Broker、重启两个应用，
 
 测试脚本会真实消耗优惠券 #3/#2 库存。E2E 拒绝已使用的 #3 活动。`scripts/failure-recovery.mjs` 会操作当前 Compose 服务，禁止用于共享或生产环境。
 
+CI 还通过 Chromium 在桌面和手机尺寸运行注册 → 秒杀 → 确认 → 点赞 → 退出流程，保存真实页面截图。复现浏览器测试需要 Node.js 22：`npm ci`、`npx playwright install chromium`、`npm run test:ui`。
+
 [GitHub Actions](https://github.com/ZhouHuimin0111/flashsale-order-system/actions) 每次运行保存 `verification-reports`，含 XML、E2E 实测 JSON 和容器日志。请求速率含成功、重复、售罄响应，只是该环境的一次正确性冒烟测试，不能作为生产容量或“万级 QPS”依据。
 
 ## 架构
@@ -107,5 +109,6 @@ docs/                 API、架构、运维、简历与面试材料
 - 详情缓存是最终一致性：提交后删除 + 120–179 秒 TTL；失效失败和并发回填可能短暂读到旧详情。库存预检读取独立的 Lua 库存键，不依赖详情缓存。
 - 全部秒杀 Lua Key 使用同一优惠券 hash tag，支持未来 Redis Cluster 的脚本分槽；**当前客户端配置只部署单节点**。社交多键交集使用公共 `{social}`，会成为单槽扩展瓶颈。
 - 默认账号密码和单节点配置仅用于本地演示。公网部署应配置 TLS、网络隔离、真实秘密、注册防滥用与高可用；不直接暴露 Actuator 或数据库。
+- 网关使用固定的两实例发现配置，未实现动态摘除不健康实例。应用重启期间可能短暂连接失败；恢复测试会等待两个实例 readiness 均通过，再核验同一订单。
 
 继续阅读：[API](docs/API.md) · [架构与取舍](docs/ARCHITECTURE.md) · [恢复运维](docs/RUNBOOK.md) · [简历与面试](docs/RESUME.md)

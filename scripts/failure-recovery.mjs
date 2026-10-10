@@ -20,6 +20,9 @@ try{
   // Restart both applications to prove pending delivery does not rely on an in-memory queue.
   docker('restart','order-1','order-2');
 }finally{docker('start','broker');}
+// `docker compose restart` returns before either Spring application is ready.
+// Wait for BOTH health checks, so a duplicate POST isn't routed to a still-booting instance.
+docker('up','-d','--no-build','--wait','--wait-timeout','120');
 let confirmed=false;
 for(let i=0;i<150;i++){
   try{const r=await api(`/coupons/2/orders/${order.orderId}`,user.token);if(r.status==='CONFIRMED'){confirmed=true;break;}}catch{ /* backend restarts may return 502 */ }
@@ -27,5 +30,5 @@ for(let i=0;i<150;i++){
 }
 assert.ok(confirmed,'Durable pending event must recover after broker + applications restart');
 const duplicate=await api('/coupons/2/orders',user.token,'POST');assert.equal(duplicate.orderId,order.orderId);assert.equal(duplicate.duplicate,true);
-const report={timestamp:new Date().toISOString(),brokerOutage:true,bothApplicationsRestarted:true,orderId:order.orderId,recovered:true,duplicateReturnedSameOrder:true};
+const report={timestamp:new Date().toISOString(),brokerOutage:true,bothApplicationsRestarted:true,bothApplicationsReady:true,orderId:order.orderId,recovered:true,duplicateReturnedSameOrder:true};
 await fs.mkdir('test-results',{recursive:true});await fs.writeFile('test-results/failure-recovery.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));

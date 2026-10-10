@@ -39,6 +39,12 @@ jobs:
           bash scripts/assert-database.sh
       - name: Broker outage and application restart recovery
         run: node scripts/failure-recovery.mjs
+      - name: Desktop and mobile browser verification
+        run: |
+          npm ci --ignore-scripts
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y fonts-noto-cjk
+          npm run test:ui
       - name: Collect reports and container logs
         if: always()
         run: |

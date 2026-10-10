@@ -1,0 +1,30 @@
+import {test,expect} from '@playwright/test';
+
+test('register, reserve, confirm, like, logout on the real API',async({page},info)=>{
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const username=`ui_${info.project.name}_${Date.now().toString(36)}`;
+  await page.goto('/');
+  await expect(page.locator('.coupon-card')).toHaveCount(3);
+  await page.screenshot({path:`test-results/${info.project.name}-home.png`,fullPage:true});
+  await page.getByRole('button',{name:'登录 / 注册 ↗',exact:true}).click();
+  await page.getByRole('button',{name:'还没有账号？创建账号',exact:true}).click();
+  await page.getByLabel('用户名',{exact:true}).fill(username);
+  await page.getByLabel('密码',{exact:true}).fill('BrowserPass2026!');
+  await page.getByRole('button',{name:'创建账号 ↗',exact:true}).click();
+  await expect(page.getByRole('button',{name:`${username} · 退出`,exact:true})).toBeVisible();
+  await page.locator('[data-buy="1"]').click();
+  await expect(page.locator('.order-row')).toHaveCount(1);
+  await expect(page.getByText('已确认',{exact:true})).toBeVisible({timeout:60000});
+  await page.screenshot({path:`test-results/${info.project.name}-order.png`,fullPage:true});
+  await page.getByRole('button',{name:'灵感社区',exact:true}).click();
+  await expect(page.locator('.post-card')).toHaveCount(3);
+  await page.locator('[data-like="1"]').click();
+  await expect(page.locator('[data-like="1"]')).toHaveClass(/liked/);
+  await page.screenshot({path:`test-results/${info.project.name}-community.png`,fullPage:true});
+  await page.getByRole('button',{name:`${username} · 退出`,exact:true}).click();
+  await expect(page.getByRole('button',{name:'登录 / 注册 ↗',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'我的订单',exact:true}).click();
+  await expect(page.getByText('登录后查看你的订单。',{exact:true})).toBeVisible();
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+});
